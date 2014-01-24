@@ -1,5 +1,4 @@
-/*
-Package migration automatically handles versioning of a database 
+Package migration for Golang automatically handles versioning of a database 
 schema by applying a series of migrations supplied by the client. It uses 
 features only from the database/sql package, so it tries to be driver 
 independent. However, to track the version of the database, it is necessary to 
@@ -16,5 +15,20 @@ changes to your schema. Notably, MySQL does not support this, although SQLite
 and PostgreSQL do.)
 
 The version of a database is defined as the number of migrations applied to it.
-*/
-package migration
+
+
+### Installation
+
+If you have Go installed and
+[your GOPATH is setup](http://golang.org/doc/code.html#GOPATH), then 
+`migration` can be installed with `go get`:
+
+    go get github.com/BurntSushi/migration
+
+
+### Documentation
+
+Documentation is available at
+[godoc.org/github.com/BurntSushi/migration](http://godoc.org/github.com/BurntSushi/migration).
+
+
