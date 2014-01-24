@@ -99,35 +99,33 @@ func Open(driver, dsn string, migrations []Migrator) (*sql.DB, error) {
 }
 
 // OpenWith is exactly like Open, except it allows the client to specify their
-// own versioning scheme. Note that versionGet and versionSet must BOTH be
+// own versioning scheme. Note that vget and vset must BOTH be
 // nil or BOTH be non-nil. Otherwise, this function panics. This is because the
 // implementation of one generally relies on the implementation of the other.
 //
-// If versionGet and versionSet are both set to nil, then the behavior of this
+// If vget and vset are both set to nil, then the behavior of this
 // function is identical to the behavior of Open.
 func OpenWith(
 	driver, dsn string,
 	migrations []Migrator,
-	versionGet GetVersion,
-	versionSet SetVersion,
+	vget GetVersion,
+	vset SetVersion,
 ) (*sql.DB, error) {
-	if (versionGet == nil && versionSet != nil) ||
-		(versionGet != nil && versionSet == nil) {
-		panic("versionGet/versionSet must both be nil or both be non-nil")
+	if (vget == nil && vset != nil) || (vget != nil && vset == nil) {
+		panic("vget/vset must both be nil or both be non-nil")
 	}
-	if versionGet == nil {
-		versionGet = DefaultGetVersion
+	if vget == nil {
+		vget = DefaultGetVersion
 	}
-	if versionSet == nil {
-		versionSet = DefaultSetVersion
+	if vset == nil {
+		vset = DefaultSetVersion
 	}
 
 	db, err := sql.Open(driver, dsn)
 	if err != nil {
 		return nil, err
 	}
-	m := migration{db, migrations, versionGet, versionSet}
-	if err := m.migrate(); err != nil {
+	if err := (migration{db, migrations, vget, vset}).migrate(); err != nil {
 		return nil, err
 	}
 	return db, nil
