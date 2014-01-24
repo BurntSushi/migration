@@ -32,3 +32,9 @@ Documentation is available at
 [godoc.org/github.com/BurntSushi/migration](http://godoc.org/github.com/BurntSushi/migration).
 
 
+### Unstable
+
+At the moment, I'm still experimenting with the public API, so I may still 
+introduce breaking changes. In general though, I am happy with the overall 
+architecture.
+
