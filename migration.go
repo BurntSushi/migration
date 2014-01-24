@@ -105,7 +105,11 @@ func Open(driver, dsn string, migrations []Migrator) (*sql.DB, error) {
 //
 // If vget and vset are both set to nil, then the behavior of this
 // function is identical to the behavior of Open.
-func OpenWith(driver, dsn string, migrations []Migrator, vget GetVersion, vset SetVersion) (*sql.DB, error) {
+func OpenWith(
+	driver, dsn string,
+	migrations []Migrator,
+	vget GetVersion, vset SetVersion,
+) (*sql.DB, error) {
 	if (vget == nil && vset != nil) || (vget != nil && vset == nil) {
 		panic("vget/vset must both be nil or both be non-nil")
 	}
