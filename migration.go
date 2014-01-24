@@ -7,6 +7,19 @@ import (
 
 var ef = fmt.Errorf
 
+// LimitedTx specifies the behavior of a transaction *without* commit and
+// rollback functions. Values with this type are given to client functions.
+// In particular, the migration routines in this package
+// handle transaction commits and rollbacks. There the functions provided by
+// the client should not use them.
+type LimitedTx interface {
+	Exec(query string, args ...interface{}) (sql.Result, error)
+	Prepare(query string) (*sql.Stmt, error)
+	Query(query string, args ...interface{}) (*sql.Rows, error)
+	QueryRow(query string, args ...interface{}) *sql.Row
+	Stmt(stmt *sql.Stmt) *sql.Stmt
+}
+
 // GetVersion is any function that can retrieve the migration version of a
 // particular database. It is exposed in case a client wants to override the
 // default behavior of this package. (For example, by using the `user_version`
@@ -20,7 +33,11 @@ var ef = fmt.Errorf
 // yet.
 //
 // If an error is returned, the migration automatically fails.
-type GetVersion func(*sql.Tx) (int, error)
+//
+// Note that a LimitedTx is used to emphasize that functions with this type
+// MUST NOT call Commit or Rollback. The migration routine in this pacakge will
+// do it for you.
+type GetVersion func(LimitedTx) (int, error)
 
 // The default way to get the version from a database. If the database has
 // had no migrations performed, then it creates a table with a single row and
@@ -35,7 +52,11 @@ var DefaultGetVersion GetVersion = defaultGetVersion
 //
 // If an error is returned, the migration that tried to set the version
 // automatically fails.
-type SetVersion func(*sql.Tx, int) error
+//
+// Note that a LimitedTx is used to emphasize that functions with this type
+// MUST NOT call Commit or Rollback. The migration routine in this pacakge will
+// do it for you.
+type SetVersion func(LimitedTx, int) error
 
 // The default way to set the version of the database. If the database has had
 // no migrations performed, then it creates a table with a single row and a
@@ -47,16 +68,18 @@ var DefaultSetVersion SetVersion = defaultSetVersion
 // Migrator corresponds to a function that updates the database by one version.
 // Note that a migration should NOT call Rollback or Commit. Instead, this
 // package will call Rollback for you if your migration returns an error. If
-// no error is returned, then Commit is called.
-type Migrator func(*sql.Tx) error
+// no error is returned, then the next migration is applied. When all
+// migrations have been applied, the version is updated and the changes are
+// committed to the database.
+type Migrator func(LimitedTx) error
 
-// Open wraps the Open function from the database/sql function, but performs
+// Open wraps the Open function from the database/sql package, but performs
 // a series of migrations on a database if they haven't been performed already.
 //
 // Migrations are tracked by a simple versioning scheme. The version of the
 // database is the number of migrations that have been performed on it.
 // Similarly, the version of your library is the number of migrations that are
-// defined.
+// given to this function.
 //
 // If Open returns successfully, then the database and your library will have
 // the same versions. If there was a problem migrating---or if the database
@@ -77,7 +100,7 @@ func Open(driver, dsn string, migrations []Migrator) (*sql.DB, error) {
 
 // OpenWith is exactly like Open, except it allows the client to specify their
 // own versioning scheme. Note that versionGet and versionSet must BOTH be
-// nil or BOTH be non-nil. Otherwise, this function panics. This because the
+// nil or BOTH be non-nil. Otherwise, this function panics. This is because the
 // implementation of one generally relies on the implementation of the other.
 //
 // If versionGet and versionSet are both set to nil, then the behavior of this
@@ -167,7 +190,7 @@ func (m migration) migrate() error {
 	return nil
 }
 
-func defaultGetVersion(tx *sql.Tx) (int, error) {
+func defaultGetVersion(tx LimitedTx) (int, error) {
 	v, err := getVersion(tx)
 	if err != nil {
 		if err := createVersionTable(tx); err != nil {
@@ -178,7 +201,7 @@ func defaultGetVersion(tx *sql.Tx) (int, error) {
 	return v, nil
 }
 
-func defaultSetVersion(tx *sql.Tx, version int) error {
+func defaultSetVersion(tx LimitedTx, version int) error {
 	if err := setVersion(tx, version); err != nil {
 		if err := createVersionTable(tx); err != nil {
 			return err
@@ -188,7 +211,7 @@ func defaultSetVersion(tx *sql.Tx, version int) error {
 	return nil
 }
 
-func getVersion(tx *sql.Tx) (int, error) {
+func getVersion(tx LimitedTx) (int, error) {
 	var version int
 	r := tx.QueryRow("SELECT version FROM migration_version")
 	if err := r.Scan(&version); err != nil {
@@ -197,12 +220,12 @@ func getVersion(tx *sql.Tx) (int, error) {
 	return version, nil
 }
 
-func setVersion(tx *sql.Tx, version int) error {
+func setVersion(tx LimitedTx, version int) error {
 	_, err := tx.Exec("UPDATE migration_version SET version = $1", version)
 	return err
 }
 
-func createVersionTable(tx *sql.Tx) error {
+func createVersionTable(tx LimitedTx) error {
 	_, err := tx.Exec(`
 		CREATE TABLE migration_version (
 			version INTEGER
