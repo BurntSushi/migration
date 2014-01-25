@@ -137,13 +137,14 @@ type migration struct {
 	setVersion SetVersion
 }
 
+// Stmt satisfies the LimitedTx interface.
+func (m migration) Stmt(stmt *sql.Stmt) *sql.Stmt {
+	return stmt
+}
+
 func (m migration) migrate() error {
-	tx, err := m.Begin()
-	if err != nil {
-		return ef("Could not start transaction: %s", err)
-	}
 	libVersion := len(m.migrations)
-	dbVersion, err := m.getVersion(tx)
+	dbVersion, err := m.getVersion(m)
 	if err != nil {
 		return ef("Could not get DB version: %s", err)
 	}
@@ -152,9 +153,13 @@ func (m migration) migrate() error {
 			dbVersion, libVersion)
 	}
 	if dbVersion == libVersion {
-		return tx.Commit()
+		return nil
 	}
 
+	tx, err := m.Begin()
+	if err != nil {
+		return ef("Could not start transaction: %s", err)
+	}
 	for i := dbVersion; i < libVersion; i++ {
 		if err := m.migrations[i](tx); err != nil {
 			if err2 := tx.Rollback(); err2 != nil {
